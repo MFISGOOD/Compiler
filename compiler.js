@@ -17,64 +17,87 @@ Compiler.prototype.tokenize = function (program) {
 Compiler.prototype.pass1 = function (program) {
   var tokens = this.tokenize(program);
   // return un-optimized AST
-  return tokens;
+  return parse(tokens);
 };
 
 Compiler.prototype.pass2 = function (ast) {
   // return AST with constant expressions reduced
+  return ast;
 };
 
 Compiler.prototype.pass3 = function (ast) {
   // return assembly instructions
+  return ast;
 };
 
 
-function unit(program) {
+function unit(program,argsList) {
       var match, expr;
        if (match = /^\d+\b/.exec(program[0]))
-        expr = {type: "value", value: Number(match[0])};
-      // else if (program[0] === '-' || program[0] === '+')
-      //   expr = {type: "signe", value: program[0]};
-      else if (match = /^[^\s(),"]+/.exec(program[0]))
-        expr = {type: "variable", name: match[0]};
+        expr = { op: 'imm', n: Number(match[0])}
+      else if (match = /^[^\s(),"]+/.exec(program[0])){
+        let variable = match[0];
+        if(argsList && variable in argsList){
+           expr = {op: "arg", n: argsList[variable]};
+        }else if(argsList){
+          throw new ReferenceError(`${variable}`);
+        }else{
+           expr = {op: "arg", n: variable}; // args-list
+        }       
+      }
       else if (program[0] === '(')
         expr = {type: "delimiter", value: '('};
       else
         throw new SyntaxError("Unexpected syntax: " + program[0]);
       program.shift();
-      return factor(expr, program);
+      return factor(expr, program,argsList);
 }
 function parse(program) {
-      var result = unit(program);
+      // var result = unit(program);
+      var result = functionDef(program);
       if (program.length > 0)
         throw new SyntaxError("Unexpected text after program");
       return result;
 }
-function factor(expr, program) {
-      // if(expr.type === 'signe') {
-      //  let signed = unit(program);
-      //   signed.negatif = expr.value === "-";
-      //   return signed;
-      // }
+function factor(expr, program,argsList) {
       if (expr.type != "delimiter")
-          return term(expr,program);
-      expr = expression(unit(program),program);
+          return term(expr,program,argsList);
+      expr = expression(unit(program,argsList),program);
        if (program[0] != ")")
           throw new SyntaxError("Expected  ')'");
        program.shift();
-       return term(expr, program);
+       return term(expr, program,argsList);
 }
-function term(expr,program){
+function term(expr,program,argsList){
    if(program[0] !== "*" && program[0] !== "/" )
-         return expression(expr,program); 
-   expr = {type: "operation", value: [expr,program.shift(),unit(program)]}; 
-   return expression(expr,program);
+         return expression(expr,program,argsList); 
+   expr = {op: program.shift() , a:expr, b:unit(program,argsList)}; 
+   return expression(expr,program,argsList);
 }
-function expression(expr,program){
+function expression(expr,program,argsList){
   if(program[0] !== "+" && program[0] !== "-" )
          return expr; 
-   expr = {type: "operation", value: [expr,program.shift(),unit(program)]}; 
-   return expression(expr,program);
+   expr = {op: program.shift() , a:expr, b:unit(program,argsList)}; 
+   return expression(expr,program,argsList);
+}
+function functionDef(program){
+   if(program[0] !== '['){
+      return unit(program);
+   }else{
+      let argsList ={};
+      let nth = 0;
+      program.shift();
+      while(program.length > 0 && program[0] !== ']'){
+          let arg = unit(program);
+          if(arg.op !== 'arg')
+               throw new SyntaxError(`Unexpected token ${arg.n}`);
+          argsList[arg.n] = nth++; 
+      }
+      if(program[0] !== ']')
+            throw new SyntaxError(`Invalid function definition`);
+       program.shift();
+      return unit(program,argsList);
+   } 
 }
 function evaluate(expr){
   if(expr.type === 'value'){
@@ -93,5 +116,6 @@ function reduce(expr){
   }
   return expr;
 }
+
 
 

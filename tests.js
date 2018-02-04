@@ -10,11 +10,11 @@ report(c,'{}');
 
 var p1 = c.pass1(prog);
 report("Pass1");
-report(JSON.stringify(p1) ,t1);
+report(p1,t1);
 
 var p2 = c.pass2(p1);
 report("Pass2");
-report(JSON.stringify(p2) ,t2);
+report(p2 ,t2);
 
 var p3 = c.pass3(p2);
 report('prog(4,0,0) == 3');
